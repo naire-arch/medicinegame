@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Medicine, Condition, or Supplement Game</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --correct: #16a34a;
+      --wrong: #dc2626;
+      --border: #e2e8f0;
+      --soft: #f1f5f9;
+      --ok-bg: #dcfce7; --ok-text: #166534;
+      --bad-bg: #fee2e2; --bad-text: #991b1b;
+      --hover-bg: #eff6ff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f172a; --card: #1e293b; --text: #e2e8f0; --muted: #94a3b8;
+        --border: #334155; --soft: #0f172a; --hover-bg: #1e3a5f;
+        --ok-bg: #14532d; --ok-text: #bbf7d0; --bad-bg: #7f1d1d; --bad-text: #fecaca;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text);
+      display: flex; justify-content: center; align-items: center;
+      min-height: 100vh; margin: 0; padding: 1rem;
+    }
+    .container {
+      background: var(--card); max-width: 500px; width: 100%;
+      padding: 2rem; border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,.06);
+      border: 1px solid var(--border); text-align: center;
+    }
+    .header {
+      display: flex; justify-content: space-between; gap: .5rem;
+      font-size: .9rem; font-weight: 600; color: var(--muted); margin-bottom: .75rem;
+    }
+    .bar { height: 6px; background: var(--soft); border-radius: 99px; overflow: hidden; margin-bottom: 1.25rem; }
+    .bar > div { height: 100%; width: 0; background: var(--primary); transition: width .3s ease; }
+    .term-box { background: var(--soft); padding: 2rem 1rem; border-radius: 12px; margin-bottom: 1.5rem; }
+    .eyebrow { margin: 0 0 .5rem; font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .term-title { font-size: 1.75rem; font-weight: 700; margin: 0; overflow-wrap: anywhere; }
+    .streak { min-height: 1.2rem; font-size: .85rem; color: var(--muted); margin-top: .5rem; }
+
+    button { font: inherit; }
+    .buttons { display: grid; gap: .75rem; }
+    .buttons button, .btn {
+      padding: .9rem 1.2rem; font-size: 1rem; font-weight: 600;
+      border: 2px solid var(--border); border-radius: 10px;
+      background: var(--card); color: var(--text); cursor: pointer;
+      transition: all .15s ease; text-align: left;
+    }
+    .buttons button kbd { float: right; opacity: .5; font-size: .75rem; }
+    .buttons button:hover:not(:disabled), .btn:hover { border-color: var(--primary); background: var(--hover-bg); }
+    .buttons button:disabled { cursor: default; }
+    .buttons button.is-correct { border-color: var(--correct); background: var(--ok-bg); color: var(--ok-text); }
+    .buttons button.is-wrong { border-color: var(--wrong); background: var(--bad-bg); color: var(--bad-text); }
+    button:focus-visible, input:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+
+    .feedback { margin-top: 1.25rem; padding: 1rem; border-radius: 10px; font-size: .95rem; line-height: 1.4; text-align: left; }
+    .feedback.correct { background: var(--ok-bg); color: var(--ok-text); }
+    .feedback.wrong { background: var(--bad-bg); color: var(--bad-text); }
+    .primary-btn {
+      margin-top: 1rem; width: 100%; background: var(--primary); color: #fff;
+      border: none; text-align: center !important; padding: .9rem; border-radius: 10px;
+      font-weight: 600; cursor: pointer;
+    }
+    .primary-btn:hover { background: var(--primary-hover) !important; }
+    .hidden { display: none !important; }
+    .missed { text-align: left; background: var(--soft); border-radius: 10px; padding: .75rem 1rem; margin: 1rem 0; font-size: .9rem; }
+    .missed ul { margin: .4rem 0 0; padding-left: 1.2rem; }
+    .note { color: var(--muted); font-size: .8rem; margin-top: 1rem; }
+
+    /* ---------- Chatbot ---------- */
+    .chat-fab {
+      position: fixed; right: 1rem; bottom: 1rem; width: 56px; height: 56px; border-radius: 50%;
+      background: var(--primary); color: #fff; border: none; font-size: 1.5rem; cursor: pointer;
+      box-shadow: 0 6px 18px rgba(37,99,235,.4); z-index: 20;
+    }
+    .chat-fab:hover { background: var(--primary-hover); }
+    .chat {
+      position: fixed; right: 1rem; bottom: 5rem; width: min(380px, calc(100vw - 2rem));
+      height: min(520px, calc(100vh - 7rem)); background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; box-shadow: 0 14px 40px rgba(0,0,0,.2); display: flex; flex-direction: column;
+      overflow: hidden; z-index: 20;
+    }
+    .chat-head { background: var(--primary); color: #fff; padding: .75rem 1rem; display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
+    .chat-head button { background: none; border: none; color: #fff; font-size: 1.2rem; cursor: pointer; }
+    .chat-log { flex: 1; overflow-y: auto; padding: .75rem; display: flex; flex-direction: column; gap: .5rem; text-align: left; }
+    .msg { max-width: 85%; padding: .55rem .8rem; border-radius: 14px; font-size: .9rem; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .msg.bot { background: var(--soft); align-self: flex-start; border-bottom-left-radius: 4px; }
+    .msg.user { background: var(--primary); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .typing span { display: inline-block; width: 6px; height: 6px; margin: 0 1px; background: var(--muted); border-radius: 50%; animation: blink 1s infinite; }
+    .typing span:nth-child(2) { animation-delay: .15s; } .typing span:nth-child(3) { animation-delay: .3s; }
+    @keyframes blink { 0%, 80%, 100% { opacity: .2; } 40% { opacity: 1; } }
+    .chips { display: flex; flex-wrap: wrap; gap: .4rem; padding: 0 .75rem .5rem; }
+    .chip { border: 1px solid var(--primary); color: var(--primary); background: transparent; border-radius: 99px; padding: .25rem .7rem; font-size: .8rem; cursor: pointer; }
+    .chip:hover { background: var(--hover-bg); }
+    .chat-form { display: flex; gap: .4rem; padding: .6rem; border-top: 1px solid var(--border); }
+    .chat-form input { flex: 1; padding: .6rem .8rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--text); font: inherit; font-size: .9rem; }
+    .chat-form button { background: var(--primary); color: #fff; border: none; border-radius: 10px; padding: 0 .9rem; cursor: pointer; font-weight: 600; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  </style>
+</head>
+<body>
+
+<main class="container" id="game-container">
+  <div id="game-view">
+    <div class="header">
+      <span id="progress">Question 1 of 10</span>
+      <span id="best"></span>
+      <span id="score">Score: 0</span>
+    </div>
+    <div class="bar" aria-hidden="true"><div id="bar-fill"></div></div>
+
+    <div class="term-box">
+      <p class="eyebrow">Classify this term</p>
+      <h1 class="term-title" id="term-name">Loading...</h1>
+      <div class="streak" id="streak"></div>
+    </div>
+
+    <div class="buttons" id="options" role="group" aria-label="Answer choices"></div>
+
+    <div class="feedback hidden" id="feedback" role="status" aria-live="polite"></div>
+    <button class="primary-btn hidden" id="next-btn" type="button">Next Term →</button>
+  </div>
+
+  <div id="results-view" class="hidden">
+    <h2>Game Complete!</h2>
+    <p style="font-size:1.25rem;margin:1rem 0" id="final-score"></p>
+    <p id="final-msg" style="color:var(--muted)"></p>
+    <div class="missed hidden" id="missed"></div>
+    <button class="primary-btn" id="again-btn" type="button">Play Again</button>
+  </div>
+
+  <p class="note">Educational use only. This is not medical advice.</p>
+</main>
+
+<button class="chat-fab" id="chat-fab" type="button" aria-label="Open study assistant" aria-expanded="false">💬</button>
+
+<section class="chat hidden" id="chat" aria-label="Study assistant">
+  <div class="chat-head"><span>🩺 Study Assistant</span><button type="button" id="chat-close" aria-label="Close chat">✕</button></div>
+  <div class="chat-log" id="chat-log" role="log" aria-live="polite"></div>
+  <div class="chips" id="chips"></div>
+  <form class="chat-form" id="chat-form" autocomplete="off">
+    <input id="chat-input" type="text" placeholder="Ask about a term…" aria-label="Message" maxlength="200">
+    <button type="submit">Send</button>
+  </form>
+</section>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ================= DATA ================= */
+  const CATEGORIES = {
+    Medicine:   { label: "💊 Medicine",           def: "A **medicine** is a drug used to diagnose, treat, cure or prevent disease. It is tested and regulated, and many need a prescription." },
+    Condition:  { label: "🩺 Medical Condition",  def: "A **medical condition** is a disease, disorder or abnormal state of the body. It is what is being diagnosed or treated, not what you take." },
+    Supplement: { label: "🌿 Dietary Supplement", def: "A **dietary supplement** (vitamin, mineral, herb, oil) adds to the diet. It is not meant to treat or cure disease and is regulated less strictly than medicines." }
+  };
+
+  // hint = a clue that does NOT give away the category
+  const BANK = [
+    // Medicines
+    { term: "Amoxicillin", category: "Medicine", aliases: ["amoxil"], hint: "It works against bacteria.", explanation: "Amoxicillin is a penicillin-type antibiotic prescribed to treat bacterial infections." },
+    { term: "Ibuprofen", category: "Medicine", aliases: ["brufen", "advil"], hint: "It belongs to the NSAID family.", explanation: "Ibuprofen is a nonsteroidal anti-inflammatory drug (NSAID) used to reduce pain, inflammation and fever." },
+    { term: "Metformin", category: "Medicine", aliases: ["glucophage"], hint: "It is a first-line choice for type 2 diabetes.", explanation: "Metformin is a first-line prescription drug used to manage blood sugar in type 2 diabetes." },
+    { term: "Paracetamol", category: "Medicine", aliases: ["acetaminophen", "panadol", "tylenol"], hint: "Also called acetaminophen.", explanation: "Paracetamol (acetaminophen) is an analgesic and antipyretic used for mild pain and fever." },
+    { term: "Salbutamol", category: "Medicine", aliases: ["albuterol", "ventolin"], hint: "A reliever inhaler contains it.", explanation: "Salbutamol is a bronchodilator that relaxes airway muscles to relieve wheeze and breathlessness." },
+    { term: "Omeprazole", category: "Medicine", aliases: ["losec", "prilosec"], hint: "It is a proton pump inhibitor.", explanation: "Omeprazole reduces stomach acid and is used for reflux and ulcers." },
+    { term: "Amlodipine", category: "Medicine", aliases: ["norvasc"], hint: "It is a calcium channel blocker.", explanation: "Amlodipine is a calcium channel blocker prescribed to lower blood pressure and treat angina." },
+    { term: "Insulin", category: "Medicine", aliases: [], hint: "A hormone given by injection or pump.", explanation: "Insulin is a hormone medicine that lowers blood glucose; it is essential in type 1 diabetes." },
+    { term: "Furosemide", category: "Medicine", aliases: ["lasix", "frusemide"], hint: "A 'water tablet' that makes you pass more urine.", explanation: "Furosemide is a loop diuretic used to remove excess fluid in heart failure, kidney disease and oedema." },
+    { term: "Warfarin", category: "Medicine", aliases: ["coumadin"], hint: "It needs regular INR blood tests.", explanation: "Warfarin is an anticoagulant ('blood thinner') that lowers the risk of clots. Its effect is monitored with the INR." },
+    // Conditions
+    { term: "Hypertension", category: "Condition", aliases: ["high blood pressure"], hint: "It is measured with a cuff on the arm.", explanation: "Hypertension is the medical term for persistently high blood pressure." },
+    { term: "Anemia", category: "Condition", aliases: ["anaemia"], hint: "Haemoglobin is low.", explanation: "Anemia is a condition marked by a deficiency of red blood cells or haemoglobin." },
+    { term: "Osteoarthritis", category: "Condition", aliases: ["oa"], hint: "It affects joints, often with age or wear.", explanation: "Osteoarthritis is a degenerative joint condition involving the breakdown of cartilage." },
+    { term: "Type 2 Diabetes", category: "Condition", aliases: ["diabetes", "t2dm", "type 2 diabetes mellitus"], hint: "Blood glucose stays too high because of insulin resistance.", explanation: "Type 2 diabetes is a chronic condition in which the body resists insulin or does not make enough, leading to high blood glucose." },
+    { term: "Asthma", category: "Condition", aliases: [], hint: "Airways narrow and cause wheeze.", explanation: "Asthma is a chronic inflammatory airway condition causing wheeze, cough and breathlessness." },
+    { term: "Kwashiorkor", category: "Condition", aliases: ["severe acute malnutrition"], hint: "Often seen with swollen feet and low protein intake.", explanation: "Kwashiorkor is a form of severe acute malnutrition with oedema, linked to inadequate protein intake." },
+    { term: "Malaria", category: "Condition", aliases: [], hint: "Spread by Anopheles mosquitoes.", explanation: "Malaria is a parasitic infection (Plasmodium) spread by mosquito bites, causing fever and chills." },
+    { term: "Hypoglycaemia", category: "Condition", aliases: ["hypoglycemia", "low blood sugar"], hint: "Glucose drops too low.", explanation: "Hypoglycaemia is abnormally low blood glucose, causing shakiness, sweating and confusion." },
+    { term: "Chronic Kidney Disease", category: "Condition", aliases: ["ckd"], hint: "eGFR gradually falls over months to years.", explanation: "Chronic kidney disease is a long-term, progressive loss of kidney function." },
+    { term: "GERD", category: "Condition", aliases: ["acid reflux", "gastro-oesophageal reflux disease", "reflux"], hint: "Heartburn is the classic symptom.", explanation: "GERD is a condition where stomach acid repeatedly flows back into the oesophagus." },
+    // Supplements
+    { term: "Melatonin", category: "Supplement", aliases: [], hint: "Often taken at bedtime. Rules vary by country.", explanation: "Melatonin is commonly sold as an over-the-counter dietary supplement to support sleep (in some countries it is prescription-only)." },
+    { term: "Omega-3 Fish Oil", category: "Supplement", aliases: ["fish oil", "omega 3", "omega-3"], hint: "Comes from oily fish, sold in capsules.", explanation: "Omega-3 fatty acids from fish oil are taken as a nutritional supplement." },
+    { term: "Vitamin D3", category: "Supplement", aliases: ["cholecalciferol", "vitamin d"], hint: "The 'sunshine vitamin' in a capsule.", explanation: "Vitamin D3 (cholecalciferol) is a fat-soluble vitamin supplement supporting bone and immune health." },
+    { term: "Probiotics", category: "Supplement", aliases: ["probiotic"], hint: "Live bacteria that are found in yoghurt or capsules.", explanation: "Probiotics are live microorganisms sold as supplements to support gut health." },
+    { term: "Magnesium", category: "Supplement", aliases: [], hint: "A mineral often sold for cramps or sleep.", explanation: "Magnesium is a mineral commonly taken as a supplement to top up dietary intake." },
+    { term: "Vitamin C", category: "Supplement", aliases: ["ascorbic acid"], hint: "Found in citrus fruit, also sold as tablets.", explanation: "Vitamin C (ascorbic acid) is a water-soluble vitamin commonly taken as a supplement." },
+    { term: "Turmeric (Curcumin)", category: "Supplement", aliases: ["turmeric", "curcumin"], hint: "A yellow spice extract sold in capsules.", explanation: "Curcumin from turmeric is a popular herbal supplement; it is not an approved treatment for any disease." },
+    { term: "Multivitamin", category: "Supplement", aliases: ["multivitamins"], hint: "One pill with many micronutrients.", explanation: "A multivitamin combines several vitamins and minerals to supplement the diet." },
+    { term: "Calcium Supplement", category: "Supplement", aliases: ["calcium"], hint: "Supports bones when diet is short.", explanation: "Calcium supplements top up dietary calcium to support bone health." },
+    { term: "Spirulina", category: "Supplement", aliases: [], hint: "A blue-green algae powder.", explanation: "Spirulina is an algae-based dietary supplement rich in protein and some micronutrients." }
+  ];
+
+  const ROUND_SIZE = 10;
+  const BEST_KEY = "mcs-game-best";
+
+  /* ================= HELPERS ================= */
+  const $ = id => document.getElementById(id);
+  const shuffle = arr => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+  const norm = s => s.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+  const loadBest = () => { try { return Number(localStorage.getItem(BEST_KEY)) || 0; } catch { return 0; } };
+  const saveBest = v => { try { localStorage.setItem(BEST_KEY, String(v)); } catch {} };
+
+  /* ================= GAME ================= */
+  const state = { queue: [], index: 0, score: 0, streak: 0, answered: false, missed: [], best: loadBest() };
+  const keys = Object.keys(CATEGORIES);
+
+  function buildOptions() {
+    const box = $("options");
+    box.replaceChildren();
+    keys.forEach((key, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.dataset.category = key;
+      b.textContent = CATEGORIES[key].label;
+      const k = document.createElement("kbd");
+      k.textContent = String(i + 1);
+      b.appendChild(k);
+      b.addEventListener("click", () => checkAnswer(key));
+      box.appendChild(b);
+    });
+  }
+
+  function startGame() {
+    state.queue = shuffle(BANK).slice(0, ROUND_SIZE);
+    Object.assign(state, { index: 0, score: 0, streak: 0, answered: false, missed: [] });
+    $("results-view").classList.add("hidden");
+    $("game-view").classList.remove("hidden");
+    loadQuestion();
+  }
+
+  const current = () => state.queue[state.index];
+
+  function loadQuestion() {
+    const q = current();
+    state.answered = false;
+    $("progress").textContent = `Question ${state.index + 1} of ${state.queue.length}`;
+    $("score").textContent = `Score: ${state.score}`;
+    $("best").textContent = state.best ? `Best: ${state.best}` : "";
+    $("bar-fill").style.width = `${(state.index / state.queue.length) * 100}%`;
+    $("term-name").textContent = q.term;
+    $("streak").textContent = state.streak >= 2 ? `🔥 ${state.streak} in a row` : "";
+    $("feedback").className = "feedback hidden";
+    $("next-btn").classList.add("hidden");
+    document.querySelectorAll("#options button").forEach(b => {
+      b.disabled = false;
+      b.classList.remove("is-correct", "is-wrong");
+    });
+  }
+
+  function checkAnswer(selected) {
+    if (state.answered) return;
+    state.answered = true;
+    const q = current();
+    const right = selected === q.category;
+    const fb = $("feedback");
+
+    document.querySelectorAll("#options button").forEach(b => {
+      b.disabled = true;
+      if (b.dataset.category === q.category) b.classList.add("is-correct");
+      else if (b.dataset.category === selected) b.classList.add("is-wrong");
+    });
+
+    if (right) {
+      state.score++; state.streak++;
+      fb.textContent = `Correct! ${q.explanation}`;
+    } else {
+      state.streak = 0;
+      state.missed.push(q);
+      fb.textContent = `Incorrect. It's a ${q.category}. ${q.explanation}`;
+    }
+    fb.className = `feedback ${right ? "correct" : "wrong"}`;
+    $("score").textContent = `Score: ${state.score}`;
+    $("streak").textContent = state.streak >= 2 ? `🔥 ${state.streak} in a row` : "";
+
+    const next = $("next-btn");
+    next.textContent = state.index < state.queue.length - 1 ? "Next Term →" : "See Final Results";
+    next.classList.remove("hidden");
+    next.focus();
+    Chat.onAnswered(q, right);
+  }
+
+  function nextQuestion() {
+    if (!state.answered) return;
+    state.index++;
+    state.index < state.queue.length ? loadQuestion() : showResults();
+  }
+
+  function showResults() {
+    const total = state.queue.length;
+    const isBest = state.score > state.best;
+    if (isBest) { state.best = state.score; saveBest(state.best); }
+    $("bar-fill").style.width = "100%";
+    $("game-view").classList.add("hidden");
+    $("results-view").classList.remove("hidden");
+    $("final-score").textContent = `You scored ${state.score} out of ${total}.`;
+    $("final-msg").textContent = isBest ? "🎉 New personal best!" :
+      state.score === total ? "Perfect round!" : state.score >= total * 0.7 ? "Nice work. Keep it up!" : "Good practice. Review the terms below and try again.";
+
+    const m = $("missed");
+    m.replaceChildren();
+    if (state.missed.length) {
+      m.classList.remove("hidden");
+      const t = document.createElement("strong"); t.textContent = "Review these:"; m.appendChild(t);
+      const ul = document.createElement("ul");
+      state.missed.forEach(q => {
+        const li = document.createElement("li");
+        li.textContent = `${q.term}: ${q.category}`;
+        ul.appendChild(li);
+      });
+      m.appendChild(ul);
+    } else m.classList.add("hidden");
+    $("again-btn").focus();
+    Chat.say(`Round over: ${state.score}/${total}. ${state.missed.length ? "Ask me about any term you missed, for example \"what is " + state.missed[0].term + "?\"" : "No misses, great job!"}`);
+  }
+
+  $("next-btn").addEventListener("click", nextQuestion);
+  $("again-btn").addEventListener("click", startGame);
+
+  document.addEventListener("keydown", e => {
+    if (e.target.tagName === "INPUT" || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!$("game-view").classList.contains("hidden")) {
+      const i = Number(e.key) - 1;
+      if (!state.answered && i >= 0 && i < keys.length) checkAnswer(keys[i]);
+      else if (state.answered && (e.key === "Enter" || e.key === "ArrowRight")) { e.preventDefault(); nextQuestion(); }
+    }
+  });
+
+  /* ================= CHATBOT (offline, rule-based) ================= */
+  const Chat = (() => {
+    const panel = $("chat"), log = $("chat-log"), chips = $("chips"), input = $("chat-input"), fab = $("chat-fab");
+    let greeted = false;
+
+    const DEFAULT_CHIPS = ["Give me a hint", "Explain the categories", "My score", "How do I play?"];
+
+    function addMsg(text, who) {
+      const d = document.createElement("div");
+      d.className = `msg ${who}`;
+      // Render **bold** safely (no innerHTML)
+      text.split(/\*\*(.+?)\*\*/g).forEach((part, i) => {
+        if (i % 2) { const s = document.createElement("strong"); s.textContent = part; d.appendChild(s); }
+        else d.appendChild(document.createTextNode(part));
+      });
+      log.appendChild(d);
+      log.scrollTop = log.scrollHeight;
+      return d;
+    }
+
+    function setChips(list) {
+      chips.replaceChildren();
+      list.forEach(t => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "chip"; b.textContent = t;
+        b.addEventListener("click", () => send(t));
+        chips.appendChild(b);
+      });
+    }
+
+    function say(text, delay = 450) {
+      const t = document.createElement("div");
+      t.className = "msg bot typing";
+      t.innerHTML = "<span></span><span></span><span></span>"; // static markup only
+      log.appendChild(t); log.scrollTop = log.scrollHeight;
+      setTimeout(() => { t.remove(); addMsg(text, "bot"); }, delay);
+    }
+
+    // --- lookup ---
+    const lev = (a, b) => {
+      const dp = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+      for (let j = 1; j <= b.length; j++) dp[0][j] = j;
+      for (let i = 1; i <= a.length; i++)
+        for (let j = 1; j <= b.length; j++)
+          dp[i][j] = Math.min(dp[i-1][j] + 1, dp[i][j-1] + 1, dp[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+      return dp[a.length][b.length];
+    };
+
+    function findEntry(msg) {
+      const n = ` ${norm(msg)} `;
+      let best = null, bestLen = 0;
+      for (const e of BANK) {
+        for (const name of [e.term, ...e.aliases]) {
+          const nn = norm(name);
+          if (nn && n.includes(` ${nn} `) && nn.length > bestLen) { best = e; bestLen = nn.length; }
+        }
+      }
+      if (best) return best;
+      // typo tolerance for single words of 5+ letters
+      for (const w of norm(msg).split(" ").filter(w => w.length >= 5)) {
+        for (const e of BANK) {
+          for (const name of [e.term, ...e.aliases]) {
+            const nn = norm(name);
+            if (!nn.includes(" ") && Math.abs(nn.length - w.length) <= 2 && lev(w, nn) <= (w.length > 7 ? 2 : 1)) return e;
+          }
+        }
+      }
+      return null;
+    }
+
+    const has = (m, re) => re.test(m);
+
+    function reply(raw) {
+      const m = norm(raw);
+      const q = state.queue[state.index];
+      const inGame = !$("game-view").classList.contains("hidden") && q;
+
+      if (!m) return "Type a question, or tap one of the suggestions below.";
+
+      // Safety: no personal medical advice
+      if (has(m, /\b(dose|dosage|how much|how many mg|should i take|can i take|prescribe|diagnose|my (child|baby|mother|father|son|daughter)|i have (a )?(pain|fever|symptoms?))\b/)) {
+        return "I can only help with this study game, not with personal medical questions or dosing. For health concerns, please speak to a doctor, pharmacist or other qualified health professional. In an emergency, call your local emergency number.";
+      }
+      if (has(m, /^(hi|hello|hey|habari|jambo)\b/)) return "Hi! I'm your study assistant. Ask me about any term, or say \"hint\" when you're stuck.";
+      if (has(m, /\b(thanks|thank you|asante)\b/)) return "You're welcome! Ready for the next one?";
+
+      if (has(m, /\b(how do i play|how to play|how does this work|rules?|instructions?)\b/) && !findEntry(raw))
+        return "Each round shows a term. Choose **Medicine**, **Medical Condition** or **Dietary Supplement**. You can also press **1**, **2**, **3** to answer and **Enter** for the next term. Ask me for a hint any time!";
+
+      if (has(m, /\b(score|how am i doing|progress|streak)\b/))
+        return `You have ${state.score} correct so far${state.index ? ` out of ${state.index + (state.answered ? 1 : 0)} answered` : ""}. Current streak: ${state.streak}.${state.best ? ` Your best round is ${state.best}/${ROUND_SIZE}.` : ""}`;
+
+      if (has(m, /\b(difference|differ|categories|category|compare|vs|versus)\b/) && !findEntry(raw))
+        return `${CATEGORIES.Medicine.def}\n\n${CATEGORIES.Condition.def}\n\n${CATEGORIES.Supplement.def}`;
+
+      if (has(m, /\b(hint|clue|stuck|help me|i dont know|not sure)\b/)) {
+        if (!inGame) return "Start a round first, then I can give you a hint.";
+        if (state.answered) return `That one's already answered: **${q.term}** is a ${q.category}. Press Next to continue.`;
+        return `Hint: ${q.hint}\nThink: is it something you take, something you have, or something that adds to your diet?`;
+      }
+
+      if (has(m, /\b(why|explain|answer|what was that)\b/) && inGame && state.answered && !findEntry(raw))
+        return `**${q.term}** is a ${q.category}. ${q.explanation}`;
+
+      if (has(m, /\b(list|how many|terms|topics)\b/) && !findEntry(raw)) {
+        const c = k => BANK.filter(e => e.category === k).length;
+        return `I know ${BANK.length} terms: ${c("Medicine")} medicines, ${c("Condition")} conditions and ${c("Supplement")} supplements. Ask about any of them by name.`;
+      }
+
+      const e = findEntry(raw);
+      if (e) {
+        // Do not spoil the question that is currently on screen
+        if (inGame && e === q && !state.answered)
+          return `That's the term on screen, so I won't give the answer away. Hint: ${e.hint}`;
+        return `**${e.term}** is a ${e.category.toLowerCase()}.\n${e.explanation}`;
+      }
+
+      return "I'm not sure about that. I can explain any term in the game, give hints, show your score, or describe the three categories. Try \"what is metformin?\" or \"hint\".";
+    }
+
+    function send(text) {
+      const t = text.trim();
+      if (!t) return;
+      addMsg(t, "user");
+      say(reply(t));
+      input.value = "";
+    }
+
+    function open(show) {
+      panel.classList.toggle("hidden", !show);
+      fab.setAttribute("aria-expanded", String(show));
+      if (show) {
+        if (!greeted) {
+          greeted = true;
+          say("Hi! I'm your study assistant. I can give hints, explain terms, and show your score. I work offline and don't give medical advice.", 200);
+          setChips(DEFAULT_CHIPS);
+        }
+        input.focus();
+      } else fab.focus();
+    }
+
+    fab.addEventListener("click", () => open(panel.classList.contains("hidden")));
+    $("chat-close").addEventListener("click", () => open(false));
+    $("chat-form").addEventListener("submit", e => { e.preventDefault(); send(input.value); });
+    panel.addEventListener("keydown", e => { if (e.key === "Escape") open(false); });
+
+    return {
+      say,
+      onAnswered(q, right) {
+        if (panel.classList.contains("hidden")) return;
+        setChips([`Tell me more about ${q.term}`, ...DEFAULT_CHIPS.slice(1)]);
+      }
+    };
+  })();
+
+  /* ================= INIT ================= */
+  buildOptions();
+  startGame();
+})();
+</script>
+</body>
+</html>
